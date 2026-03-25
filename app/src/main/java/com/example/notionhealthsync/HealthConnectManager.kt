@@ -66,6 +66,7 @@ class HealthConnectManager(private val context: Context) {
             HealthPermission.getReadPermission(BodyFatRecord::class),
             HealthPermission.getReadPermission(StepsRecord::class),
             "android.permission.health.READ_HEALTH_DATA_HISTORY",
+            "android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND",
         )
     }
 }

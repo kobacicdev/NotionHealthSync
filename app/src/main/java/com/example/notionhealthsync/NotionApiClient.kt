@@ -19,7 +19,8 @@ class NotionApiClient(
     private val jsonMediaType = "application/json".toMediaType()
 
     fun upsertRecord(healthData: HealthData, syncTime: Instant, date: String): Boolean {
-        val existingId = findRecordByDate(date)
+        val (existingId, duplicateIds) = findRecordsByDate(date)
+        duplicateIds.forEach { archivePage(it) }
         return if (existingId != null) {
             updateRecord(existingId, healthData, syncTime, date)
         } else {
@@ -27,10 +28,10 @@ class NotionApiClient(
         }
     }
 
-    private fun findRecordByDate(date: String): String? {
+    private fun findRecordsByDate(date: String): Pair<String?, List<String>> {
         val body = JSONObject().put(
             "filter", JSONObject()
-                .put("property", "日付")
+                .put("property", "レコード名")
                 .put("title", JSONObject().put("equals", date))
         )
         val request = Request.Builder()
@@ -41,10 +42,28 @@ class NotionApiClient(
             .post(body.toString().toRequestBody(jsonMediaType))
             .build()
 
-        val responseStr = httpClient.newCall(request).execute().use { it.body?.string() }
-            ?: return null
+        val response = httpClient.newCall(request).execute()
+        val responseStr = response.use {
+            if (!it.isSuccessful) throw IllegalStateException("Notion API error ${it.code}: ${it.body?.string()}")
+            it.body?.string()
+        } ?: return Pair(null, emptyList())
+
         val results = JSONObject(responseStr).getJSONArray("results")
-        return if (results.length() > 0) results.getJSONObject(0).getString("id") else null
+        if (results.length() == 0) return Pair(null, emptyList())
+        val ids = (0 until results.length()).map { results.getJSONObject(it).getString("id") }
+        return Pair(ids.first(), ids.drop(1))
+    }
+
+    private fun archivePage(pageId: String) {
+        val body = JSONObject().put("archived", true)
+        val request = Request.Builder()
+            .url("https://api.notion.com/v1/pages/$pageId")
+            .addHeader("Authorization", "Bearer $apiToken")
+            .addHeader("Content-Type", "application/json")
+            .addHeader("Notion-Version", "2022-06-28")
+            .patch(body.toString().toRequestBody(jsonMediaType))
+            .build()
+        httpClient.newCall(request).execute().close()
     }
 
     private fun createRecord(healthData: HealthData, syncTime: Instant, date: String): Boolean {
@@ -82,7 +101,7 @@ class NotionApiClient(
         val syncDatetime = DateTimeFormatter.ISO_INSTANT.format(syncTime)
 
         return JSONObject().apply {
-            put("日付", JSONObject().put("title", JSONArray().put(
+            put("レコード名", JSONObject().put("title", JSONArray().put(
                 JSONObject().put("text", JSONObject().put("content", today))
             )))
             put("計測日", JSONObject().put("date", JSONObject().put("start", measurementDate)))
