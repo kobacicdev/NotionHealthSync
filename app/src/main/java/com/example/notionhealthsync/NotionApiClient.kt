@@ -6,16 +6,34 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.IOException
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.concurrent.TimeUnit
 
 class NotionApiClient(
     private val apiToken: String,
     private val databaseId: String
 ) {
-    private val httpClient = OkHttpClient()
+    private val httpClient = OkHttpClient.Builder()
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
+        .writeTimeout(30, TimeUnit.SECONDS)
+        .addInterceptor { chain ->
+            var lastException: IOException? = null
+            repeat(3) { attempt ->
+                try {
+                    return@addInterceptor chain.proceed(chain.request())
+                } catch (e: IOException) {
+                    lastException = e
+                    if (attempt < 2) Thread.sleep(1000L * (attempt + 1))
+                }
+            }
+            throw lastException!!
+        }
+        .build()
     private val jsonMediaType = "application/json".toMediaType()
 
     fun upsertRecord(healthData: HealthData, syncTime: Instant, date: String): Boolean {

@@ -26,7 +26,8 @@ data class UiState(
     val syncHour: Int = 7,
     val syncMinute: Int = 0,
     val showSettings: Boolean = false,
-    val isNotionConfigured: Boolean = false
+    val isNotionConfigured: Boolean = false,
+    val syncLogs: List<SyncLogEntry> = emptyList()
 )
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -62,7 +63,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _uiState.value = _uiState.value.copy(
                 weight = data.weight?.let { "%.1f kg".format(it) } ?: "-",
                 bodyFat = data.bodyFat?.let { "%.1f %%".format(it) } ?: "-",
-                steps = data.steps?.toString() ?: "-"
+                steps = data.steps?.toString() ?: "-",
+                syncLogs = PreferencesManager.getSyncLogs(getApplication())
             )
         } catch (_: Exception) {}
     }
@@ -105,7 +107,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 .collect { info ->
                     if (info?.state?.isFinished == true) {
                         val now = LocalDateTime.now().format(DateTimeFormatter.ofPattern("MM/dd HH:mm"))
-                        _uiState.value = _uiState.value.copy(isSyncing = false, lastSyncTime = now)
+                        _uiState.value = _uiState.value.copy(
+                            isSyncing = false,
+                            lastSyncTime = now,
+                            syncLogs = PreferencesManager.getSyncLogs(getApplication())
+                        )
                         when (info.state) {
                             WorkInfo.State.SUCCEEDED -> _snackbarMessage.emit(completionMessage)
                             WorkInfo.State.FAILED -> _snackbarMessage.emit("同期失敗。通知を確認してください")

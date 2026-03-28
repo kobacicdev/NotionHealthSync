@@ -10,7 +10,9 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
@@ -132,7 +134,8 @@ fun HealthSyncScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(24.dp),
+                .padding(24.dp)
+                .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -203,6 +206,25 @@ fun HealthSyncScreen(
                 ) {
                     Text("期間指定で同期")
                 }
+            }
+
+            HorizontalDivider()
+
+            Text(
+                text = "同期ログ",
+                style = MaterialTheme.typography.titleSmall,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            if (uiState.syncLogs.isEmpty()) {
+                Text(
+                    text = "同期履歴なし",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            } else {
+                uiState.syncLogs.take(20).forEach { log -> SyncLogRow(log) }
             }
 
             HorizontalDivider()
@@ -350,6 +372,50 @@ fun DateRangePickerDialog(
         }
     ) {
         DateRangePicker(state = state, modifier = Modifier.fillMaxWidth())
+    }
+}
+
+@Composable
+fun SyncLogRow(entry: SyncLogEntry) {
+    val (statusIcon, statusColor) = when (entry.status) {
+        SyncStatus.SUCCESS -> "✓" to MaterialTheme.colorScheme.primary
+        SyncStatus.SKIPPED -> "–" to MaterialTheme.colorScheme.onSurfaceVariant
+        SyncStatus.FAILED -> "✗" to MaterialTheme.colorScheme.error
+    }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = "$statusIcon ${entry.date}",
+                style = MaterialTheme.typography.bodySmall,
+                color = statusColor
+            )
+            Text(
+                text = entry.executedAt,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        when (entry.status) {
+            SyncStatus.SUCCESS -> Text(
+                text = "体重: %.1fkg / 体脂肪: %.1f%% / 歩数: %d".format(entry.weight, entry.bodyFat, entry.steps),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            SyncStatus.SKIPPED, SyncStatus.FAILED -> if (entry.message.isNotBlank()) {
+                Text(
+                    text = entry.message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
     }
 }
 
