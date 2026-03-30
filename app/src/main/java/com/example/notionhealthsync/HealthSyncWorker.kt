@@ -88,7 +88,7 @@ class HealthSyncWorker(
         )
 
         rescheduleNextDay()
-        return if (failCount > 0) Result.retry() else Result.success()
+        return if (failCount > 0) Result.failure() else Result.success()
     }
 
     private suspend fun syncSingleDate(

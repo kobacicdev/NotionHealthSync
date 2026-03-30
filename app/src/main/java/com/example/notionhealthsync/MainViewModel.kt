@@ -133,6 +133,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun refreshLogs() {
+        _uiState.value = _uiState.value.copy(
+            syncLogs = PreferencesManager.getSyncLogs(getApplication())
+        )
+    }
+
     fun showDateRangePicker() { _uiState.value = _uiState.value.copy(showDateRangePicker = true) }
     fun hideDateRangePicker() { _uiState.value = _uiState.value.copy(showDateRangePicker = false) }
     fun showTimePicker() { _uiState.value = _uiState.value.copy(showTimePicker = true) }

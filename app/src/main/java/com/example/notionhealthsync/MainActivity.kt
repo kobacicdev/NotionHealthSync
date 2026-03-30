@@ -3,17 +3,24 @@ package com.example.notionhealthsync
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -61,8 +68,19 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        requestBatteryOptimizationExemption()
         SyncScheduler.scheduleDailySync(this)
         mainViewModel.checkPermissionsAndLoad()
+    }
+
+    private fun requestBatteryOptimizationExemption() {
+        val pm = getSystemService(PowerManager::class.java)
+        if (!pm.isIgnoringBatteryOptimizations(packageName)) {
+            val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                data = Uri.parse("package:$packageName")
+            }
+            startActivity(intent)
+        }
     }
 
     private fun createNotificationChannel() {
@@ -210,11 +228,16 @@ fun HealthSyncScreen(
 
             HorizontalDivider()
 
-            Text(
-                text = "同期ログ",
-                style = MaterialTheme.typography.titleSmall,
-                modifier = Modifier.fillMaxWidth()
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("同期ログ", style = MaterialTheme.typography.titleSmall)
+                IconButton(onClick = { viewModel.refreshLogs() }) {
+                    Icon(Icons.Filled.Refresh, contentDescription = "ログを更新")
+                }
+            }
 
             if (uiState.syncLogs.isEmpty()) {
                 Text(
@@ -224,7 +247,12 @@ fun HealthSyncScreen(
                     modifier = Modifier.fillMaxWidth()
                 )
             } else {
-                uiState.syncLogs.take(20).forEach { log -> SyncLogRow(log) }
+                LazyColumn(modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 300.dp)
+                ) {
+                    items(uiState.syncLogs) { log -> SyncLogRow(log) }
+                }
             }
 
             HorizontalDivider()
