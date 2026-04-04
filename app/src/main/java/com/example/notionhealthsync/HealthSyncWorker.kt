@@ -38,7 +38,11 @@ class HealthSyncWorker(
             syncScheduled(healthManager, notion, executedAt)
         } else {
             val dateStr = inputData.getString(KEY_DATE) ?: LocalDate.now().toString()
-            val result = syncSingleDate(healthManager, notion, LocalDate.parse(dateStr), executedAt, sendNotification = true)
+            val date = LocalDate.parse(dateStr)
+            if (PreferencesManager.isDateSynced(context, date)) {
+                return Result.success()
+            }
+            val result = syncSingleDate(healthManager, notion, date, executedAt, sendNotification = true)
             if (result == SyncStatus.FAILED) Result.retry() else Result.success()
         }
     }

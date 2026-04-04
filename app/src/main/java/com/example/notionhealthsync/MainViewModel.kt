@@ -12,12 +12,14 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 data class UiState(
     val weight: String = "-",
     val bodyFat: String = "-",
     val steps: String = "-",
+    val measurementDate: String = "",
     val lastSyncTime: String = "未同期",
     val isSyncing: Boolean = false,
     val hasPermission: Boolean = false,
@@ -59,14 +61,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private suspend fun loadHealthData() {
         try {
-            val data = healthManager.readTodayData()
+            val data = healthManager.readRecentData()
+            val measurementDate = data.measurementTime
+                ?.atZone(ZoneId.systemDefault())
+                ?.toLocalDate()
+            val dateLabel = when {
+                measurementDate == null -> ""
+                measurementDate == LocalDate.now() -> "本日"
+                else -> measurementDate.format(DateTimeFormatter.ofPattern("M/d"))
+            }
             _uiState.value = _uiState.value.copy(
                 weight = data.weight?.let { "%.1f kg".format(it) } ?: "-",
                 bodyFat = data.bodyFat?.let { "%.1f %%".format(it) } ?: "-",
                 steps = data.steps?.toString() ?: "-",
+                measurementDate = dateLabel,
                 syncLogs = PreferencesManager.getSyncLogs(getApplication())
             )
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            android.util.Log.e("HealthSync", "loadHealthData failed", e)
+        }
     }
 
     fun syncNow() {

@@ -16,9 +16,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
@@ -152,8 +150,7 @@ fun HealthSyncScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(24.dp)
-                .verticalScroll(rememberScrollState()),
+                .padding(horizontal = 24.dp, vertical = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -171,6 +168,14 @@ fun HealthSyncScreen(
                 ) {
                     DataRow("体重", uiState.weight)
                     DataRow("体脂肪率", uiState.bodyFat)
+                    if (uiState.measurementDate.isNotEmpty() && uiState.measurementDate != "本日") {
+                        Text(
+                            text = "計測日: ${uiState.measurementDate}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                     DataRow("歩数", uiState.steps)
                     HorizontalDivider()
                     DataRow("最終同期", uiState.lastSyncTime)
@@ -228,35 +233,36 @@ fun HealthSyncScreen(
 
             HorizontalDivider()
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("同期ログ", style = MaterialTheme.typography.titleSmall)
-                IconButton(onClick = { viewModel.refreshLogs() }) {
-                    Icon(Icons.Filled.Refresh, contentDescription = "ログを更新")
-                }
-            }
-
-            if (uiState.syncLogs.isEmpty()) {
-                Text(
-                    text = "同期履歴なし",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            } else {
-                LazyColumn(modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 300.dp)
+            // ログ部分：残りスペースをすべて占有してスクロール
+            Column(modifier = Modifier.weight(1f)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    items(uiState.syncLogs) { log -> SyncLogRow(log) }
+                    Text("同期ログ", style = MaterialTheme.typography.titleSmall)
+                    IconButton(onClick = { viewModel.refreshLogs() }) {
+                        Icon(Icons.Filled.Refresh, contentDescription = "ログを更新")
+                    }
+                }
+
+                if (uiState.syncLogs.isEmpty()) {
+                    Text(
+                        text = "同期履歴なし",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                } else {
+                    LazyColumn(modifier = Modifier.fillMaxSize()) {
+                        items(uiState.syncLogs) { log -> SyncLogRow(log) }
+                    }
                 }
             }
 
             HorizontalDivider()
 
+            // 自動同期設定：常に下部に固定
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,

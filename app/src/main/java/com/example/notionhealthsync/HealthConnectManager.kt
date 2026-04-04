@@ -24,6 +24,23 @@ class HealthConnectManager(private val context: Context) {
 
     suspend fun readTodayData(): HealthData = readDataForDate(LocalDate.now())
 
+    suspend fun readRecentData(lookbackDays: Int = 7): HealthData {
+        val today = LocalDate.now()
+        val todayData = readDataForDate(today)
+        if (todayData.weight != null) return todayData
+        for (i in 1 until lookbackDays) {
+            val past = readDataForDate(today.minusDays(i.toLong()))
+            if (past.weight != null) {
+                return todayData.copy(
+                    weight = past.weight,
+                    bodyFat = past.bodyFat,
+                    measurementTime = past.measurementTime
+                )
+            }
+        }
+        return todayData
+    }
+
     suspend fun readDataForDate(date: LocalDate): HealthData {
         val startOfDay = date.atStartOfDay(ZoneId.systemDefault()).toInstant()
         val endOfDay = date.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant()
