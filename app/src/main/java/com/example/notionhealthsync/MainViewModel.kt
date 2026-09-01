@@ -95,8 +95,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _uiState.value = _uiState.value.copy(isSyncing = true, showDateRangePicker = false)
             val days = startDate.datesUntil(endDate.plusDays(1)).count()
             _snackbarMessage.emit("${days}日分の同期を開始しました")
-            val ids = SyncScheduler.syncDateRange(getApplication(), startDate, endDate)
-            observeWork(ids.last(), "${days}日分の同期完了")
+            val id = SyncScheduler.syncDateRange(getApplication(), startDate, endDate)
+            observeWork(id, "${days}日分の同期完了")
         }
     }
 
