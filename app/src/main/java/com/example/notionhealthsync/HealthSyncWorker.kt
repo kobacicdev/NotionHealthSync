@@ -76,8 +76,8 @@ class HealthSyncWorker(
             val (_, status) = results.first()
             val log = PreferencesManager.getSyncLogs(context).firstOrNull()
             when (status) {
-                SyncStatus.SUCCESS -> "体重: %.1fkg / 体脂肪: %.1f%% / 歩数: %d".format(log?.weight, log?.bodyFat, log?.steps)
-                SyncStatus.SKIPPED -> log?.message ?: "データ不足のためスキップ"
+                SyncStatus.SUCCESS -> formatSummary(log?.weight, log?.bodyFat, log?.steps)
+                SyncStatus.SKIPPED -> log?.message ?: "データなしのためスキップ"
                 SyncStatus.FAILED -> log?.message ?: "同期失敗"
             }
         } else {
@@ -116,13 +116,8 @@ class HealthSyncWorker(
             return SyncStatus.FAILED
         }
 
-        if (data.weight == null || data.bodyFat == null || data.steps == null) {
-            val missing = listOfNotNull(
-                if (data.weight == null) "体重" else null,
-                if (data.bodyFat == null) "体脂肪率" else null,
-                if (data.steps == null) "歩数" else null
-            ).joinToString(", ")
-            val msg = "データ不足: $missing"
+        if (data.weight == null && data.bodyFat == null && data.steps == null) {
+            val msg = "データなし"
             PreferencesManager.addSyncLog(context, SyncLogEntry(
                 date = dateStr, executedAt = executedAt, status = SyncStatus.SKIPPED,
                 weight = data.weight, bodyFat = data.bodyFat, steps = data.steps, message = msg
@@ -139,10 +134,7 @@ class HealthSyncWorker(
                     weight = data.weight, bodyFat = data.bodyFat, steps = data.steps
                 ))
                 if (sendNotification) {
-                    notify(
-                        "同期完了 ($dateStr)",
-                        "体重: %.1fkg / 体脂肪: %.1f%% / 歩数: %d".format(data.weight, data.bodyFat, data.steps)
-                    )
+                    notify("同期完了 ($dateStr)", formatSummary(data.weight, data.bodyFat, data.steps))
                 }
                 PreferencesManager.saveLastSuccessDate(context, date)
                 SyncStatus.SUCCESS
@@ -164,6 +156,13 @@ class HealthSyncWorker(
             if (sendNotification) notify("同期エラー ($dateStr)", msg)
             SyncStatus.FAILED
         }
+    }
+
+    private fun formatSummary(weight: Double?, bodyFat: Double?, steps: Long?): String {
+        val weightStr = weight?.let { "%.1fkg".format(it) } ?: "-"
+        val bodyFatStr = bodyFat?.let { "%.1f%%".format(it) } ?: "-"
+        val stepsStr = steps?.let { "$it" } ?: "-"
+        return "体重: $weightStr / 体脂肪: $bodyFatStr / 歩数: $stepsStr"
     }
 
     private fun rescheduleNextDay() {
