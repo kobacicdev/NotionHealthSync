@@ -60,13 +60,20 @@ object SyncScheduler {
         return request.id
     }
 
-    fun syncDateRange(context: Context, startDate: LocalDate, endDate: LocalDate): List<UUID> {
-        val ids = mutableListOf<UUID>()
-        var current = startDate
-        while (!current.isAfter(endDate)) {
-            ids.add(syncNow(context, current))
-            current = current.plusDays(1)
-        }
-        return ids
+    fun syncDateRange(context: Context, startDate: LocalDate, endDate: LocalDate): UUID {
+        val request = OneTimeWorkRequestBuilder<HealthSyncWorker>()
+            .setInputData(workDataOf(
+                HealthSyncWorker.KEY_DATE to startDate.toString(),
+                HealthSyncWorker.KEY_END_DATE to endDate.toString(),
+                HealthSyncWorker.KEY_IS_SCHEDULED to false
+            ))
+            .setConstraints(
+                Constraints.Builder()
+                    .setRequiredNetworkType(NetworkType.CONNECTED)
+                    .build()
+            )
+            .build()
+        WorkManager.getInstance(context).enqueue(request)
+        return request.id
     }
 }

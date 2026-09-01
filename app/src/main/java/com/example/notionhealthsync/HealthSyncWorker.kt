@@ -34,16 +34,25 @@ class HealthSyncWorker(
             databaseId = PreferencesManager.getNotionDatabaseId(context)
         )
 
-        return if (isScheduled) {
-            syncScheduled(healthManager, notion, executedAt)
-        } else {
-            val dateStr = inputData.getString(KEY_DATE) ?: LocalDate.now().toString()
-            val date = LocalDate.parse(dateStr)
-            if (PreferencesManager.isDateSynced(context, date)) {
-                return Result.success()
-            }
-            val result = syncSingleDate(healthManager, notion, date, executedAt, sendNotification = true)
-            if (result == SyncStatus.FAILED) Result.retry() else Result.success()
+        if (isScheduled) return syncScheduled(healthManager, notion, executedAt)
+
+        val endDateStr = inputData.getString(KEY_END_DATE)
+        if (endDateStr != null) {
+            val startDate = LocalDate.parse(inputData.getString(KEY_DATE) ?: LocalDate.now().toString())
+            val endDate = LocalDate.parse(endDateStr)
+            return syncRange(healthManager, notion, startDate, endDate, executedAt)
+        }
+
+        val dateStr = inputData.getString(KEY_DATE) ?: LocalDate.now().toString()
+        val date = LocalDate.parse(dateStr)
+        if (PreferencesManager.isDateSynced(context, date)) {
+            return Result.success()
+        }
+        val result = syncSingleDate(healthManager, notion, date, executedAt, sendNotification = true)
+        return when {
+            result != SyncStatus.FAILED -> Result.success()
+            runAttemptCount < MAX_RETRY_COUNT -> Result.retry()
+            else -> Result.failure()
         }
     }
 
@@ -65,6 +74,32 @@ class HealthSyncWorker(
             .takeWhile { !it.isAfter(yesterday) }
             .toList()
 
+        val result = syncDatesAndNotify(healthManager, notion, dates, executedAt)
+        rescheduleNextDay()
+        return result
+    }
+
+    private suspend fun syncRange(
+        healthManager: HealthConnectManager,
+        notion: NotionApiClient,
+        startDate: LocalDate,
+        endDate: LocalDate,
+        executedAt: String
+    ): Result {
+        val dates = generateSequence(startDate) { it.plusDays(1) }
+            .takeWhile { !it.isAfter(endDate) }
+            .filterNot { PreferencesManager.isDateSynced(context, it) }
+            .toList()
+        if (dates.isEmpty()) return Result.success()
+        return syncDatesAndNotify(healthManager, notion, dates, executedAt)
+    }
+
+    private suspend fun syncDatesAndNotify(
+        healthManager: HealthConnectManager,
+        notion: NotionApiClient,
+        dates: List<LocalDate>,
+        executedAt: String
+    ): Result {
         val results = dates.map { date ->
             date to syncSingleDate(healthManager, notion, date, executedAt, sendNotification = false)
         }
@@ -91,7 +126,6 @@ class HealthSyncWorker(
             summaryBody
         )
 
-        rescheduleNextDay()
         return if (failCount > 0) Result.failure() else Result.success()
     }
 
@@ -128,7 +162,6 @@ class HealthSyncWorker(
                 weight = data.weight, bodyFat = data.bodyFat, steps = data.steps, message = msg
             ))
             if (sendNotification) notify("同期スキップ ($dateStr)", msg)
-            PreferencesManager.saveLastSuccessDate(context, date)
             return SyncStatus.SKIPPED
         }
 
@@ -189,6 +222,8 @@ class HealthSyncWorker(
         const val CHANNEL_ID = "health_sync_channel"
         const val NOTIFICATION_ID = 1001
         const val KEY_DATE = "date"
+        const val KEY_END_DATE = "end_date"
         const val KEY_IS_SCHEDULED = "is_scheduled"
+        const val MAX_RETRY_COUNT = 3
     }
 }
